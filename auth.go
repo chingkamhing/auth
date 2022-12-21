@@ -275,6 +275,7 @@ func (a *Auth) setCookie(w http.ResponseWriter, token *token) error {
 		Value:   base64Encoded,
 		Expires: time.Now().Add(time.Hour * 24 * 365 * 10), // No expiry.
 		Secure:  !a.cfg.Unsecure,
+		Path:    "/",
 	})
 	return nil
 }
