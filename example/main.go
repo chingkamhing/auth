@@ -45,7 +45,8 @@ func main() {
 			RedirectURL:  fmt.Sprintf("%s://%s:%d/%s", *scheme, *host, *port, *callbackPath),
 			ClientID:     *clientID,
 			ClientSecret: *clientSecret,
-			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+			// https://developers.google.com/identity/protocols/oauth2/scopes#oauth2
+			Scopes: []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile", "openid"},
 		},
 		Log:      log.Printf,
 		Unsecure: true,
