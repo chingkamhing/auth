@@ -67,3 +67,7 @@ the authentication phase on every authenticated page, or on different sessions.
 
 ---
 Readme created from Go doc with [goreadme](https://github.com/posener/goreadme)
+
+## References
+
+* [Google OAuth2 API, v2](https://developers.google.com/identity/protocols/oauth2/scopes#oauth2)
