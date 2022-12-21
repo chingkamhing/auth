@@ -48,6 +48,7 @@ func main() {
 		},
 		Log:      log.Printf,
 		Unsecure: true,
+		Path:     "/",
 	}
 	a, err := auth.New(context.Background(), config)
 	if err != nil {

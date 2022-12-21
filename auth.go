@@ -101,6 +101,8 @@ type Config struct {
 	Log    func(string, ...interface{}) `json:"-"`
 	Client *http.Client                 `json:"-"`
 
+	// set cookie's path
+	Path string
 	// Unsecure uses unsecured cookies (Required for http scheme).
 	Unsecure bool
 }
@@ -310,8 +312,8 @@ func (a *Auth) setCookie(w http.ResponseWriter, token *token) error {
 		Name:    cookieName,
 		Value:   base64Encoded,
 		Expires: time.Now().Add(time.Hour * 24 * 365 * 10), // No expiry.
+		Path:    a.cfg.Path,
 		Secure:  !a.cfg.Unsecure,
-		Path:    "/",
 	})
 	return nil
 }
