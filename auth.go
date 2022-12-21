@@ -244,6 +244,7 @@ func (a *Auth) RedirectHandler() http.Handler {
 		if redirectPath == "" {
 			redirectPath = "/"
 		}
+		a.logf("Successfully exchanged token, redirect back to application path %q", redirectPath)
 		http.Redirect(w, r, redirectPath, http.StatusTemporaryRedirect)
 	})
 }
