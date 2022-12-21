@@ -17,9 +17,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/posener/auth"
 	"golang.org/x/oauth2"
+)
+
+const (
+	HttpReadTimeout     = 30 * time.Second
+	HttpWriteTimeout    = 30 * time.Second
+	HttpShutdownTimeout = 30 * time.Second
 )
 
 var (
@@ -64,11 +74,62 @@ func main() {
 	mux.Handle("/"+*callbackPath, a.RedirectHandler())
 
 	addr := fmt.Sprintf(":%d", *port)
-	log.Printf("Serving at %v...", addr)
-	err = http.ListenAndServe(addr, mux)
+	errC, err := run(mux, addr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("run error: %s", err)
 	}
+	err = <-errC
+	if err != nil {
+		log.Fatalf("run server error: %s", err)
+	}
+}
+
+// run http server and graceful shutdown
+//
+// resources:
+// - https://mariocarrion.com/2021/05/21/golang-microservices-graceful-shutdown.html
+func run(r http.Handler, address string) (<-chan error, error) {
+	errC := make(chan error, 1)
+	ctx, stop := signal.NotifyContext(context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	srv := &http.Server{
+		Handler:      r,
+		Addr:         address,
+		ReadTimeout:  HttpReadTimeout,
+		WriteTimeout: HttpWriteTimeout,
+	}
+
+	go func() {
+		// wait for server termination and gracefully shutdown
+		<-ctx.Done()
+		log.Printf("Shutdown signal received")
+		ctxTimeout, cancel := context.WithTimeout(context.Background(), HttpShutdownTimeout)
+		defer func() {
+			stop()
+			cancel()
+			close(errC)
+		}()
+		srv.SetKeepAlivesEnabled(false)
+		err := srv.Shutdown(ctxTimeout)
+		if err != nil {
+			errC <- err
+		}
+		log.Printf("Shutdown completed")
+	}()
+
+	go func() {
+		// run http server
+		log.Printf("Listening and serving: %q", address)
+		err := srv.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			errC <- err
+		}
+		log.Printf("Exited server")
+	}()
+
+	return errC, nil
 }
 
 // handler is an example for http handler that is protected using Google authorization.
