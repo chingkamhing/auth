@@ -148,48 +148,6 @@ func New(ctx context.Context, cfg Config) (*Auth, error) {
 	return &Auth{validator: tokenValidator, cfg: cfg}, nil
 }
 
-// RedirectHandler should be mounted on the cfg.OAuth2.RedirectURL path.
-func (a *Auth) RedirectHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		code := r.URL.Query().Get("code")
-		token, err := a.cfg.Exchange(r.Context(), code)
-		if err != nil {
-			a.logf("Authentication failure for code %s: %s", code, err)
-			http.Error(w, "Authorization failure", http.StatusUnauthorized)
-			return
-		}
-
-		_, ok := token.Extra("id_token").(string)
-		if !ok {
-			a.logf("Invalid ID token %v (%T)", token.Extra("id_token"), token.Extra("id_token"))
-			http.Error(w, "Internal error", http.StatusInternalServerError)
-			return
-		}
-
-		err = a.setCookie(w, fromOauth2(token))
-		if err != nil {
-			a.logf("Failed setting cookie: %v", err)
-			http.Error(w, "Internal error", http.StatusInternalServerError)
-			return
-		}
-
-		redirectPath := r.URL.Query().Get("state")
-		if redirectPath == "" {
-			redirectPath = "/"
-		}
-		http.Redirect(w, r, redirectPath, http.StatusTemporaryRedirect)
-	})
-}
-
-// LogoutHandler can be mounted on an http endpoint for logging out. It will redirect to
-// the given path after user is navigating to the logout path.
-func (a *Auth) LogoutHandler(redirectPath string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		a.clearCookie(w)
-		http.Redirect(w, r, redirectPath, http.StatusTemporaryRedirect)
-	})
-}
-
 // Authenticate wraps a handler and enforces only authenticated users.
 func (a *Auth) Authenticate(handler http.Handler) http.Handler {
 	if handler == nil {
@@ -283,7 +241,6 @@ func (a *Auth) setCookie(w http.ResponseWriter, token *token) error {
 func (a *Auth) getCookie(r *http.Request) (*token, error) {
 	// Get the token from the cookie.
 	cookie, err := r.Cookie(cookieName)
-	a.logf("cookie %v err %v", cookie, err)
 	switch {
 	case err == http.ErrNoCookie || cookie.Value == "":
 		return nil, nil
@@ -311,6 +268,39 @@ func (a *Auth) logf(format string, args ...interface{}) {
 	a.cfg.Log(format, args...)
 }
 
+// RedirectHandler should be mounted on the cfg.OAuth2.RedirectURL path.
+func (a *Auth) RedirectHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		token, err := a.cfg.Exchange(r.Context(), code)
+		if err != nil {
+			a.logf("Authentication failure for code %s: %s", code, err)
+			http.Error(w, "Authorization failure", http.StatusUnauthorized)
+			return
+		}
+
+		_, ok := token.Extra("id_token").(string)
+		if !ok {
+			a.logf("Invalid ID token %v (%T)", token.Extra("id_token"), token.Extra("id_token"))
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+
+		err = a.setCookie(w, fromOauth2(token))
+		if err != nil {
+			a.logf("Failed setting cookie: %v", err)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+
+		redirectPath := r.URL.Query().Get("state")
+		if redirectPath == "" {
+			redirectPath = "/"
+		}
+		http.Redirect(w, r, redirectPath, http.StatusTemporaryRedirect)
+	})
+}
+
 // User returns the credentials of the logged in user. It returns nil in case that there is no
 // user information (This can happen when the http handler is not authenticated).
 // It should be used inside an `http.Handler` that was authenticated using
@@ -331,6 +321,15 @@ func User(ctx context.Context) *Creds {
 		return nil
 	}
 	return v.(*Creds)
+}
+
+// LogoutHandler can be mounted on an http endpoint for logging out. It will redirect to
+// the given path after user is navigating to the logout path.
+func (a *Auth) LogoutHandler(redirectPath string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a.clearCookie(w)
+		http.Redirect(w, r, redirectPath, http.StatusTemporaryRedirect)
+	})
 }
 
 type token struct {
