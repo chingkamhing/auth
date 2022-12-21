@@ -213,61 +213,6 @@ func (a *Auth) Authenticate(handler http.Handler) http.Handler {
 	})
 }
 
-func (a *Auth) clearCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name:    cookieName,
-		Value:   "",
-		Expires: time.Now(),
-		Secure:  !a.cfg.Unsecure,
-	})
-}
-
-func (a *Auth) setCookie(w http.ResponseWriter, token *token) error {
-	jsonEncoded, err := json.Marshal(token)
-	if err != nil {
-		return err
-	}
-	base64Encoded := base64.StdEncoding.EncodeToString(jsonEncoded)
-	http.SetCookie(w, &http.Cookie{
-		Name:    cookieName,
-		Value:   base64Encoded,
-		Expires: time.Now().Add(time.Hour * 24 * 365 * 10), // No expiry.
-		Secure:  !a.cfg.Unsecure,
-		Path:    "/",
-	})
-	return nil
-}
-
-func (a *Auth) getCookie(r *http.Request) (*token, error) {
-	// Get the token from the cookie.
-	cookie, err := r.Cookie(cookieName)
-	switch {
-	case err == http.ErrNoCookie || cookie.Value == "":
-		return nil, nil
-	case err != nil:
-		return nil, fmt.Errorf("failed getting cookie: %v", err)
-	}
-
-	decoded, err := base64.URLEncoding.DecodeString(cookie.Value)
-	if err != nil {
-		return nil, fmt.Errorf("failed base64 decoding cookie: %s", err)
-	}
-	t := &token{}
-	err = json.Unmarshal(decoded, t)
-	if err != nil {
-		return nil, fmt.Errorf("failed json decoding cookie: %s", err)
-	}
-	return t, nil
-}
-
-func (a *Auth) logf(format string, args ...interface{}) {
-	if a.cfg.Log == nil {
-		return
-	}
-
-	a.cfg.Log(format, args...)
-}
-
 // RedirectHandler should be mounted on the cfg.OAuth2.RedirectURL path.
 func (a *Auth) RedirectHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -336,6 +281,61 @@ type token struct {
 	*oauth2.Token
 	// Extras:
 	IDToken string `json:"id_token"`
+}
+
+func (a *Auth) logf(format string, args ...interface{}) {
+	if a.cfg.Log == nil {
+		return
+	}
+
+	a.cfg.Log(format, args...)
+}
+
+func (a *Auth) clearCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:    cookieName,
+		Value:   "",
+		Expires: time.Now(),
+		Secure:  !a.cfg.Unsecure,
+	})
+}
+
+func (a *Auth) setCookie(w http.ResponseWriter, token *token) error {
+	jsonEncoded, err := json.Marshal(token)
+	if err != nil {
+		return err
+	}
+	base64Encoded := base64.StdEncoding.EncodeToString(jsonEncoded)
+	http.SetCookie(w, &http.Cookie{
+		Name:    cookieName,
+		Value:   base64Encoded,
+		Expires: time.Now().Add(time.Hour * 24 * 365 * 10), // No expiry.
+		Secure:  !a.cfg.Unsecure,
+		Path:    "/",
+	})
+	return nil
+}
+
+func (a *Auth) getCookie(r *http.Request) (*token, error) {
+	// Get the token from the cookie.
+	cookie, err := r.Cookie(cookieName)
+	switch {
+	case err == http.ErrNoCookie || cookie.Value == "":
+		return nil, nil
+	case err != nil:
+		return nil, fmt.Errorf("failed getting cookie: %v", err)
+	}
+
+	decoded, err := base64.URLEncoding.DecodeString(cookie.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed base64 decoding cookie: %s", err)
+	}
+	t := &token{}
+	err = json.Unmarshal(decoded, t)
+	if err != nil {
+		return nil, fmt.Errorf("failed json decoding cookie: %s", err)
+	}
+	return t, nil
 }
 
 func fromOauth2(t *oauth2.Token) *token {
