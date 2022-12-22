@@ -169,7 +169,8 @@ func (a *Auth) Authenticate(handler http.Handler) http.Handler {
 			// above.
 			// Set the scope to the current request URL, it will be used by the redirect handler to
 			// redirect back to the url that requested the authentication.
-			url := a.cfg.AuthCodeURL(r.RequestURI)
+			opts := []oauth2.AuthCodeOption{oauth2.ApprovalForce, oauth2.AccessTypeOffline}
+			url := a.cfg.AuthCodeURL(r.RequestURI, opts...)
 			http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 			return
 		}
